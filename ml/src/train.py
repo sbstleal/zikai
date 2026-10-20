@@ -1,13 +1,12 @@
-# Training script for arboviral forecasting models
-"""
-Machine learning training pipeline.
+"""Pipeline de Treinamento de Modelos de Aprendizado de Máquina - ZikAI Paraíba.
 
-- Loads the feature dataset.
-- Performs temporal train/test split.
-- Cleans and prepares numerical and categorical features.
-- Trains regression models to predict future case counts (target: alvo_casos_1sem).
-- Trains classification models to predict risk level (target: alvo_risco_1sem).
-- Evaluates models and saves the best performing ones.
+- Carrega o dataset de features processadas.
+- Realiza a divisão temporal entre treino e teste (respeitando a cronologia dos dados).
+- Trata e limpa features numéricas e codifica variáveis categóricas (One-Hot Encoding).
+- Treina modelos de regressão para prever o total de casos futuros (alvo: alvo_casos_1sem).
+- Treina modelos de classificação para prever o nível de alerta/risco (alvo: alvo_risco_1sem).
+- Avalia os modelos com métricas epidemiológicas (MAE, RMSE, R², Acurácia, F1-Score).
+- Persiste os melhores modelos treinados (.joblib) e exporta relatório em JSON.
 """
 
 import argparse
@@ -35,28 +34,30 @@ from .split import load_features, temporal_train_test_split
 
 
 def prepare_data(df: pd.DataFrame, target_col: str):
-    """Filter missing target rows, separate features and target, and encode categoricals."""
-    # Drop rows without target
+    """Filtra linhas sem variável-alvo, separa atributos (X) e rótulo (y) e codifica variáveis categóricas."""
+    # Remover linhas sem o valor do alvo (semanas no final da série histórica)
     valid_df = df.dropna(subset=[target_col]).copy()
 
-    # Drop all target columns from features
+    # Remover todas as colunas de horizonte futuro para prevenir vazamento de dados (data leakage)
     target_cols = [c for c in valid_df.columns if c.startswith("alvo_")]
-    # Metadata / non-predictive identifiers
+    # Metadados e identificadores não preditivos diretos
     metadata_cols = ["municipio_id", "municipio_nome", "data_inicio_se", "microrregiao", "mesorregiao"]
     drop_cols = list(set(target_cols + metadata_cols))
 
     X = valid_df.drop(columns=drop_cols, errors="ignore")
-    # One-hot encode categorical columns like 'doenca'
+
+    # Codificação One-Hot para variáveis categóricas como 'doenca' (dengue, zika, chikungunya)
     if "doenca" in X.columns:
         X = pd.get_dummies(X, columns=["doenca"], drop_first=False, dtype=float)
 
-    # Ensure all remaining columns are numeric
+    # Garantir que todas as colunas restantes sejam puramente numéricas
     X = X.select_dtypes(include=[np.number])
     y = valid_df[target_col]
     return X, y, valid_df["data_inicio_se"]
 
 
 def train_regression(X_train, y_train, X_test, y_test):
+    """Treina e compara algoritmos de regressão para previsão quantitativa de casos."""
     pipelines = {
         "ridge": Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
@@ -88,7 +89,8 @@ def train_regression(X_train, y_train, X_test, y_test):
 
 
 def train_classification(X_train, y_train, X_test, y_test):
-    # Cast targets to int
+    """Treina e compara modelos de classificação multiclasse para o nível de alerta de risco."""
+    # Converter rótulos de risco para inteiros
     y_train = y_train.astype(int)
     y_test = y_test.astype(int)
 
@@ -121,9 +123,10 @@ def train_classification(X_train, y_train, X_test, y_test):
 
 
 def main(csv_path: str, output_dir: str, test_weeks: int = 12):
+    """Executa a rotina completa de ponta a ponta do treinamento dos modelos de IA."""
     df = load_features(csv_path)
 
-    # 1. Regressão (alvo_casos_1sem)
+    # 1. Pipeline de Regressão (alvo_casos_1sem)
     target_reg = "alvo_casos_1sem"
     X_reg, y_reg, dates_reg = prepare_data(df, target_reg)
 
@@ -143,7 +146,7 @@ def main(csv_path: str, output_dir: str, test_weeks: int = 12):
         X_train_reg, y_train_reg, X_test_reg, y_test_reg
     )
 
-    # 2. Classificação (alvo_risco_1sem)
+    # 2. Pipeline de Classificação (alvo_risco_1sem)
     target_clf = "alvo_risco_1sem"
     X_clf, y_clf, dates_clf = prepare_data(df, target_clf)
 
@@ -163,13 +166,14 @@ def main(csv_path: str, output_dir: str, test_weeks: int = 12):
         X_train_clf, y_train_clf, X_test_clf, y_test_clf
     )
 
-    # Salvar modelos
+    # Persistência dos modelos treinados (.joblib)
     os.makedirs(output_dir, exist_ok=True)
     reg_path = Path(output_dir) / f"regression_{reg_name}.joblib"
     clf_path = Path(output_dir) / f"classification_{clf_name}.joblib"
     joblib.dump(reg_model, reg_path)
     joblib.dump(clf_model, clf_path)
 
+    # Relatório estruturado de métricas para auditoria e monografia
     report = {
         "regression": {
             "target": target_reg,
@@ -198,9 +202,9 @@ def main(csv_path: str, output_dir: str, test_weeks: int = 12):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train ML models for ZikAI")
-    parser.add_argument("csv_path", help="Path to the features CSV (pb_arboviroses_features.csv)")
-    parser.add_argument("--output-dir", default="ml/models", help="Directory where models and metrics will be stored")
-    parser.add_argument("--test-weeks", type=int, default=12, help="Number of weeks to keep for test set")
+    parser = argparse.ArgumentParser(description="Treinamento de Modelos de Machine Learning - ZikAI Paraíba")
+    parser.add_argument("csv_path", help="Caminho do CSV de atributos (pb_arboviroses_features.csv)")
+    parser.add_argument("--output-dir", default="ml/models", help="Diretório onde os modelos e métricas serão salvos")
+    parser.add_argument("--test-weeks", type=int, default=12, help="Número de semanas finais reservadas para teste")
     args = parser.parse_args()
     main(args.csv_path, args.output_dir, args.test_weeks)
