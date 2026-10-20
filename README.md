@@ -75,11 +75,6 @@ Este projeto adota:
 
 ---
 
-## 👥 Autoria e Licença
-
-Desenvolvido como Trabalho de Conclusão de Curso (TCC).  
-Licença: MIT.
-
 ## 🤖 Machine Learning
 
 Esta seção descreve como treinar os modelos de previsão e classificação de risco.
@@ -87,9 +82,7 @@ Esta seção descreve como treinar os modelos de previsão e classificação de 
 ### Treinamento
 Execute o script de treinamento:
 ```powershell
-python -m ml.src.train data/processed/pb_arboviroses_features.csv \
-    --output-dir ml/models \
-    --test-weeks 12
+python -m ml.src.train data/processed/pb_arboviroses_features.csv --output-dir ml/models --test-weeks 12
 ```
 - **`--output-dir`**: diretório onde os arquivos `.joblib` e o relatório `metrics.json` serão salvos.
 - **`--test-weeks`**: número de semanas reservadas para o conjunto de teste (padrão: 12).
@@ -108,4 +101,11 @@ Um teste automatizado foi adicionado em `tests/test_ml.py` que verifica:
 > ```powershell
 > pip install -r requirements.txt
 > ```
+
+---
+
+## 👥 Autoria e Licença
+
+Desenvolvido como Trabalho de Conclusão de Curso (TCC).  
+Licença: MIT.
 
