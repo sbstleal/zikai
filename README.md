@@ -79,3 +79,33 @@ Este projeto adota:
 
 Desenvolvido como Trabalho de Conclusão de Curso (TCC).  
 Licença: MIT.
+
+## 🤖 Machine Learning
+
+Esta seção descreve como treinar os modelos de previsão e classificação de risco.
+
+### Treinamento
+Execute o script de treinamento:
+```powershell
+python -m ml.src.train data/processed/pb_arboviroses_features.csv \
+    --output-dir ml/models \
+    --test-weeks 12
+```
+- **`--output-dir`**: diretório onde os arquivos `.joblib` e o relatório `metrics.json` serão salvos.
+- **`--test-weeks`**: número de semanas reservadas para o conjunto de teste (padrão: 12).
+
+### Estrutura dos artefatos
+- `ml/models/regression_<modelo>.joblib` – modelo de regressão (Ridge ou RandomForest) que prevê o número de casos na próxima semana (`alvo_casos_1sem`).
+- `ml/models/classification_<modelo>.joblib` – modelo de classificação que prevê o risco (`alvo_risco_1sem`).
+- `ml/models/metrics.json` – relatório com as métricas de desempenho (MAE, RMSE, R², acurácia e F1).
+
+### Testes
+Um teste automatizado foi adicionado em `tests/test_ml.py` que verifica:
+- Execução bem‑sucedida do script de treinamento em um subconjunto dos dados.
+- Criação dos arquivos de modelo e do relatório de métricas.
+
+> **Importante:** antes de rodar os testes certifique‑se de que as dependências estão instaladas:
+> ```powershell
+> pip install -r requirements.txt
+> ```
+
