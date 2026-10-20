@@ -38,18 +38,27 @@ O Estado da Paraíba possui uma posição histórica e estratégica na vigilânc
 ```plaintext
 zikai/
 ├── data/
-│   ├── raw/                 # Dados brutos das APIs (ignorado pelo git)
-│   └── processed/           # Datasets processados e limpos para modelagem
+│   ├── raw/                 # Cache de respostas brutas das APIs (GeoJSON, JSON)
+│   └── processed/           # Datasets consolidados e tratados para ML
+├── data_pipeline/           # Módulos de extração e ingestão (InfoDengue + IBGE)
+│   ├── ibge.py              # Cliente para malha vetorial e municípios da PB
+│   ├── infodengue.py        # Cliente para séries epidemiológicas e climáticas
+│   └── pipeline.py          # Orquestrador da extração e carga no banco SQL
+├── backend/
+│   └── app/
+│       └── db/              # Camada de Banco de Dados SQL (PostgreSQL / SQLite)
+│           ├── models.py    # Modelos relacionais (Municipios, Registros, Previsoes)
+│           ├── session.py   # Conexão e sessão com banco
+│           └── repository.py# Operações de inserção e consulta
 ├── ml/
 │   ├── notebooks/           # Análise exploratória de dados (EDA) e prototipação
 │   ├── src/                 # Scripts modulares de ML (feature engineering, treino e teste)
 │   └── models/              # Modelos treinados salvos (.joblib, .pt)
-├── backend/
-│   └── app/                 # API REST em FastAPI para servir previsões e métricas
 ├── frontend/                # Aplicação web e dashboard em React / Vite / TailwindCSS
+├── tests/                   # Testes automatizados com pytest
 ├── docs/
 │   ├── monografia/          # Textos acadêmicos, capítulos e referências bibliográficas
-│   └── diagramas/           # Diagramas de arquitetura e fluxo de dados
+│   └── diagramas/           # Diagramas de arquitetura, fluxo de dados e DER
 ├── .gitignore               # Arquivos ignorados pelo Git
 ├── CONTRIBUTING.md          # Padrões de commits, branches e fluxo de trabalho
 └── README.md                # Apresentação do projeto

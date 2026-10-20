@@ -54,6 +54,8 @@ data/processed/*
 *.feather
 *.h5
 *.sqlite3
+*.sqlite
+*.db
 
 # ML Models artifacts
 ml/models/*.pkl
