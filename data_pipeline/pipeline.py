@@ -12,6 +12,7 @@ from typing import List, Optional
 
 import pandas as pd
 
+from .features import build_feature_dataset
 from .ibge import IBGEClient
 from .infodengue import InfoDengueClient
 from backend.app.db.session import SessionLocal, init_db
@@ -27,6 +28,8 @@ PRINCIPAIS_MUNICIPIOS_PB = {
     2506301: "Guarabira",        # Brejo Paraibano
     2509701: "Monteiro",         # Cariri Ocidental
     2513703: "Santa Rita",       # Região Metropolitana de JP
+    2501807: "Bayeux",           # Região Metropolitana de JP
+    2503209: "Cabedelo",         # Região Metropolitana de JP / Litoral Norte
 }
 
 logger = logging.getLogger("zikai.pipeline")
@@ -39,12 +42,15 @@ def run_pipeline(
     end_year: int = 2025,
     output_dir: str = "data/processed",
     force_refresh: bool = False,
+    generate_features: bool = True,
 ) -> pd.DataFrame:
     """Executa o pipeline completo de coleta e consolidação de dados da Paraíba.
 
     1. Baixa metadados e malha vetorial dos 223 municípios via IBGE.
     2. Coleta séries históricas epidemiológicas e climáticas via InfoDengue.
-    3. Consolida e exporta os datasets processados prontos para modelagem de IA.
+    3. Consolida e exporta os datasets processados (CSV).
+    4. Gera atributos de Machine Learning (lags, clima, médias móveis, sazonalidade).
+    5. Sincroniza opcionalmente com o Banco de Dados SQL.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -76,13 +82,21 @@ def run_pipeline(
 
     # 2. Coletar dados do InfoDengue
     logger.info("=== 2. Coleta de Séries Temporais (InfoDengue) ===")
-    logger.info("Municípios alvos: %d | Doenças: %s | Anos: %d-%d", len(geocodes), diseases, start_year, end_year)
+    logger.info(
+        "Municípios alvos: %d | Doenças: %s | Anos: %d-%d",
+        len(geocodes),
+        diseases,
+        start_year,
+        end_year,
+    )
 
     dataframes: List[pd.DataFrame] = []
 
     for geocode in geocodes:
         city_meta = geo_meta.get(geocode, {})
-        city_name = city_meta.get("nome_oficial", PRINCIPAIS_MUNICIPIOS_PB.get(geocode, str(geocode)))
+        city_name = city_meta.get(
+            "nome_oficial", PRINCIPAIS_MUNICIPIOS_PB.get(geocode, str(geocode))
+        )
 
         for disease in diseases:
             logger.info("Processando: %s (IBGE %d) - %s", city_name, geocode, disease.upper())
@@ -112,14 +126,30 @@ def run_pipeline(
         ["doenca", "municipio_id", "data_inicio_se"]
     ).reset_index(drop=True)
 
-    # 3. Exportar dados consolidados para CSV e para o Banco de Dados SQL
+    # 3. Exportar dados consolidados para CSV
     csv_file = output_path / "pb_arboviroses_consolidado.csv"
     df_consolidated.to_csv(csv_file, index=False, encoding="utf-8")
     logger.info("Dataset consolidado salvo em: %s (Total linhas: %d)", csv_file, len(df_consolidated))
 
-    # 4. Sincronização com o Banco de Dados SQL (PostgreSQL / SQLite)
+    # 4. Engenharia de Recursos (Feature Engineering para IA)
+    if generate_features:
+        try:
+            logger.info("=== 3. Gerando Dataset Analítico com Features para IA ===")
+            df_features = build_feature_dataset(df_consolidated)
+            feat_file = output_path / "pb_arboviroses_features.csv"
+            df_features.to_csv(feat_file, index=False, encoding="utf-8")
+            logger.info(
+                "Dataset de Features salvo em: %s (Linhas: %d, Atributos: %d)",
+                feat_file,
+                len(df_features),
+                df_features.shape[1],
+            )
+        except Exception as feat_err:
+            logger.warning("Aviso: Falha ao gerar dataset de features: %s", feat_err)
+
+    # 5. Sincronização com o Banco de Dados SQL (PostgreSQL / SQLite)
     try:
-        logger.info("Sincronizando com o Banco de Dados SQL...")
+        logger.info("=== 4. Sincronização com Banco de Dados SQL ===")
         init_db()
         with SessionLocal() as db:
             upsert_municipios(db, municipios_pb)
