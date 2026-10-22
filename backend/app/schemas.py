@@ -49,7 +49,7 @@ class SerieEpidemiologicaOut(BaseModel):
 
 
 class PrevisaoIAOut(BaseModel):
-    geocode: int = Field(..., description="Código IBGE do município")
+    municipio_geocode: int = Field(..., description="Código IBGE do município")
     doenca: str
     horizonte_semanas: int
     ano_alvo: int
