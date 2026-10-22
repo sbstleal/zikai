@@ -21,7 +21,7 @@ class MunicipioOut(BaseModel):
     longitude: Optional[float] = Field(None, description="Longitude geográfica")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SerieEpidemiologicaOut(BaseModel):
@@ -44,8 +44,8 @@ class SerieEpidemiologicaOut(BaseModel):
     umidade_maxima: Optional[float] = None
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
 
 
 class PrevisaoIAOut(BaseModel):
@@ -63,7 +63,7 @@ class PrevisaoIAOut(BaseModel):
     gerado_em: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AlertaVigilanciaOut(BaseModel):
@@ -77,4 +77,4 @@ class AlertaVigilanciaOut(BaseModel):
     emitido_em: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

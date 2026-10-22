@@ -47,7 +47,7 @@ def main() -> None:
         db.add(alerta)
 
         db.commit()
-        print("✅ Dados de seed inseridos com sucesso.")
+        print("Dados de seed inseridos com sucesso.")
     finally:
         db.close()
 
