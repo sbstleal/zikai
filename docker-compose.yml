@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Banco de Dados Relacional PostgreSQL (com suporte a PostGIS)
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: zikai_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: zikai_db
+      POSTGRES_USER: zikai_user
+      POSTGRES_PASSWORD: zikai_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zikai_user -d zikai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Servidor Backend FastAPI
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zikai_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://zikai_user:zikai_password@db:5432/zikai_db
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend:/app/backend
+
+volumes:
+  pgdata:
+    name: zikai_pgdata

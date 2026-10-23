@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
 from ..db.session import get_db
+from sqlalchemy.orm import Session
 from ..db import models
 from ..schemas import MunicipioOut
 

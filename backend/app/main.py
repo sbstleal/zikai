@@ -47,6 +47,27 @@ app.include_router(dashboard.router, prefix="/api", tags=["Dashboard"])
 def on_startup():
     """Inicializa o banco de dados ao iniciar o servidor."""
     init_db()
+    # Verifica se a tabela de municípios está vazia e, se necessário, popula‑a.
+    from .db.session import SessionLocal
+    from .db import models
+    from .db.repository import upsert_municipios
+    from pathlib import Path
+    import json
+
+    db = SessionLocal()
+    try:
+        municipio_count = db.query(models.Municipio).count()
+        if municipio_count == 0:
+            raw_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "pb_municipios_ibge.json"
+            if raw_path.exists():
+                with open(raw_path, "r", encoding="utf-8") as f:
+                    municipios_data = json.load(f)
+                inserted = upsert_municipios(db, municipios_data)
+                print(f"🔧 População automática: {inserted} municípios inseridos.")
+            else:
+                print("⚠️ Arquivo de municípios não encontrado; carregamento automático ignorado.")
+    finally:
+        db.close()
 
 @app.get("/", tags=["Saúde"])
 def health_check():

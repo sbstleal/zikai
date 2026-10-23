@@ -66,6 +66,16 @@ def test_obter_previsoes_inexistente():
     assert response.status_code == 404
 
 
+def test_obter_series_com_paginacao():
+    """Valida se a rota /api/series aplica limite e offset corretamente."""
+    response = client.get("/api/series/2507507?limite=10&offset=0")
+    assert response.status_code == 200
+    series = response.json()
+    assert isinstance(series, list)
+    assert len(series) <= 10
+
+
+
 def test_mapa_geojson():
     """Valida se o endpoint do GeoJSON da malha estadual responde corretamente."""
     response = client.get("/api/mapa/geojson")

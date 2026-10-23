@@ -25,7 +25,7 @@ class MunicipioOut(BaseModel):
 
 
 class SerieEpidemiologicaOut(BaseModel):
-    geocode: int = Field(..., alias="geocode", description="Código IBGE do município")
+    municipio_geocode: int = Field(..., description="Código IBGE do município")
     doenca: str
     data_inicio_se: date
     ano: int
