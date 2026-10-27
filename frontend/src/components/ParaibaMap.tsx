@@ -277,59 +277,42 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
               />
             )}
 
-            {/* 3ª Camada: Polígono Selecionado (Renderizado no Topo Absoluto) */}
+            {/* 3ª Camada: Polígono Selecionado (Destaque imediato com contorno e preenchimento) */}
             {selectedFeature && (
-              <path
-                d={selectedFeature.pathData}
-                fill="#0284c7"
-                stroke="#38bdf8"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
-                className="drop-shadow-lg"
-              />
-            )}
+              <g key={`selected-${selectedFeature.cod}`}>
+                <path
+                  d={selectedFeature.pathData}
+                  fill="#0284c7"
+                  stroke="#38bdf8"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
 
-            {/* Marcador e Rótulo do Município Ativo */}
-            {selectedFeature?.mun && selectedFeature.mun.latitude && selectedFeature.mun.longitude && (() => {
-              const [cx, cy] = project(selectedFeature.mun.longitude, selectedFeature.mun.latitude);
-              return (
-                <g className="pointer-events-none">
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={5}
-                    fill="#38bdf8"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                  />
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={13}
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth={2}
-                    className="animate-ping opacity-75"
-                  />
-                  <text
-                    x={cx}
-                    y={cy - 10}
-                    textAnchor="middle"
-                    fill="#ffffff"
-                    fontSize={11}
-                    fontWeight="800"
-                    stroke="#0f172a"
-                    strokeWidth="2.5"
-                    paintOrder="stroke fill"
-                    className="select-none"
-                  >
-                    {selectedFeature.mun.nome}
-                  </text>
-                </g>
-              );
-            })()}
+                {/* Rótulo estático nítido no centróide (sem bola animada nem transição fluida) */}
+                {selectedFeature.mun?.latitude && selectedFeature.mun?.longitude && (() => {
+                  const [cx, cy] = project(selectedFeature.mun.longitude, selectedFeature.mun.latitude);
+                  return (
+                    <text
+                      x={cx}
+                      y={cy}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill="#ffffff"
+                      fontSize={11}
+                      fontWeight="800"
+                      stroke="#0284c7"
+                      strokeWidth="3"
+                      paintOrder="stroke fill"
+                      className="pointer-events-none select-none"
+                    >
+                      {selectedFeature.mun.nome}
+                    </text>
+                  );
+                })()}
+              </g>
+            )}
           </svg>
         )}
       </div>
