@@ -3,13 +3,13 @@
 Este módulo fornece endpoints que retornam alertas emitidos para os municípios.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from ..db.session import get_db
 from ..db import models
-from ..schemas import AlertaVigilanciaOut
+from ..schemas import AlertaCreate, AlertaOut, AlertaVigilanciaOut
 
 router = APIRouter()
 
@@ -34,3 +34,32 @@ def listar_alertas(
     if not alertas:
         raise HTTPException(status_code=404, detail="Nenhum alerta encontrado.")
     return alertas
+
+
+@router.post(
+    "/alertas",
+    response_model=AlertaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cria um novo alerta de vigilância epidemiológica",
+)
+def criar_alerta(alerta: AlertaCreate, db: Session = Depends(get_db)):
+    """Cria um alerta de vigilância epidemiológica associado a um município existente."""
+    municipio = db.query(models.Municipio).filter(models.Municipio.geocode == alerta.municipio_geocode).first()
+    if not municipio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Município com geocode {alerta.municipio_geocode} não encontrado.",
+        )
+
+    novo = models.AlertaVigilancia(
+        municipio_geocode=alerta.municipio_geocode,
+        doenca=alerta.doenca.lower(),
+        titulo=alerta.titulo,
+        mensagem=alerta.mensagem,
+        nivel_gravidade=alerta.nivel_gravidade,
+        ativo=1,
+    )
+    db.add(novo)
+    db.commit()
+    db.refresh(novo)
+    return novo

@@ -109,3 +109,9 @@ Um teste automatizado foi adicionado em `tests/test_ml.py` que verifica:
 Desenvolvido como Trabalho de Conclusão de Curso (TCC).  
 Licença: MIT.
 
+
+## ⚙️ Inicialização automática
+
+Ao iniciar a API, o backend verifica os arquivos de catálogo em `data/raw/` (preferencialmente `pb_municipios_ibge_merged.json`) e popula ou sincroniza a tabela `municipios` automaticamente com nome, microrregião, mesorregião, população estimada e coordenadas geográficas (latitude e longitude). Isso garante que o endpoint `/api/municipios` sempre retorne dados completos sem a necessidade de intervenção manual.
+
+Caso deseje desativar esse comportamento, basta definir a variável de ambiente `POPULATE_MUNICIPIOS=false` antes de iniciar o contêiner.

@@ -28,6 +28,12 @@ def upsert_municipios(db: Session, municipios: List[Dict[str, Any]]) -> int:
             existente.mesorregiao = item.get("mesorregiao", existente.mesorregiao)
             if "populacao" in item and item["populacao"]:
                 existente.populacao = int(item["populacao"])
+            # Atualiza latitude e longitude se disponíveis
+            if "latitude" in item and item["latitude"] is not None:
+                existente.latitude = float(item["latitude"])
+            if "longitude" in item and item["longitude"] is not None:
+                existente.longitude = float(item["longitude"])
+
         else:
             novo = Municipio(
                 geocode=geocode,
@@ -35,6 +41,8 @@ def upsert_municipios(db: Session, municipios: List[Dict[str, Any]]) -> int:
                 microrregiao=item.get("microrregiao"),
                 mesorregiao=item.get("mesorregiao"),
                 populacao=int(item["populacao"]) if item.get("populacao") else None,
+                latitude=float(item["latitude"]) if item.get("latitude") is not None else None,
+                longitude=float(item["longitude"]) if item.get("longitude") is not None else None,
             )
             db.add(novo)
             count += 1

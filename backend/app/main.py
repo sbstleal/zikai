@@ -47,27 +47,32 @@ app.include_router(dashboard.router, prefix="/api", tags=["Dashboard"])
 def on_startup():
     """Inicializa o banco de dados ao iniciar o servidor."""
     init_db()
-    # Verifica se a tabela de municípios está vazia e, se necessário, popula‑a.
-    from .db.session import SessionLocal
-    from .db import models
-    from .db.repository import upsert_municipios
-    from pathlib import Path
-    import json
+    # Opcional: popular municípios apenas se a variável de ambiente estiver habilitada (padrão true)
+    import os
+    populate = os.getenv("POPULATE_MUNICIPIOS", "true").lower() == "true"
+    if populate:
+        from .db.session import SessionLocal
+        from .db import models
+        from .db.repository import upsert_municipios
+        from pathlib import Path
+        import json
 
-    db = SessionLocal()
-    try:
-        municipio_count = db.query(models.Municipio).count()
-        if municipio_count == 0:
+        db = SessionLocal()
+        try:
             raw_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "pb_municipios_ibge.json"
-            if raw_path.exists():
-                with open(raw_path, "r", encoding="utf-8") as f:
+            enriched_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "pb_municipios_ibge_enriched.json"
+            merged_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "pb_municipios_ibge_merged.json"
+            file_to_load = merged_path if merged_path.exists() else (enriched_path if enriched_path.exists() else raw_path)
+
+            if file_to_load.exists():
+                with open(file_to_load, "r", encoding="utf-8") as f:
                     municipios_data = json.load(f)
                 inserted = upsert_municipios(db, municipios_data)
-                print(f"🔧 População automática: {inserted} municípios inseridos.")
+                print(f"🔧 População automática: dados atualizados/inseridos ({len(municipios_data)} municípios processados, arquivo: {file_to_load.name}).")
             else:
                 print("⚠️ Arquivo de municípios não encontrado; carregamento automático ignorado.")
-    finally:
-        db.close()
+        finally:
+            db.close()
 
 @app.get("/", tags=["Saúde"])
 def health_check():

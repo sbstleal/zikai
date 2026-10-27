@@ -66,6 +66,14 @@ class PrevisaoIAOut(BaseModel):
         from_attributes = True
 
 
+class AlertaCreate(BaseModel):
+    municipio_geocode: int = Field(..., description="Código IBGE do município")
+    doenca: str = Field(..., description="Arbovirose: dengue, chikungunya ou zika")
+    titulo: str = Field(..., description="Título resumido do alerta")
+    mensagem: str = Field(..., description="Mensagem descritiva do alerta")
+    nivel_gravidade: int = Field(..., ge=1, le=4, description="Nível de gravidade (1=Verde a 4=Vermelho)")
+
+
 class AlertaVigilanciaOut(BaseModel):
     id: int
     municipio_geocode: int
@@ -78,3 +86,6 @@ class AlertaVigilanciaOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+AlertaOut = AlertaVigilanciaOut
