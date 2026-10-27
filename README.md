@@ -38,18 +38,27 @@ O Estado da Paraíba possui uma posição histórica e estratégica na vigilânc
 ```plaintext
 zikai/
 ├── data/
-│   ├── raw/                 # Dados brutos das APIs (ignorado pelo git)
-│   └── processed/           # Datasets processados e limpos para modelagem
+│   ├── raw/                 # Cache de respostas brutas das APIs (GeoJSON, JSON)
+│   └── processed/           # Datasets consolidados e tratados para ML
+├── data_pipeline/           # Módulos de extração e ingestão (InfoDengue + IBGE)
+│   ├── ibge.py              # Cliente para malha vetorial e municípios da PB
+│   ├── infodengue.py        # Cliente para séries epidemiológicas e climáticas
+│   └── pipeline.py          # Orquestrador da extração e carga no banco SQL
+├── backend/
+│   └── app/
+│       └── db/              # Camada de Banco de Dados SQL (PostgreSQL / SQLite)
+│           ├── models.py    # Modelos relacionais (Municipios, Registros, Previsoes)
+│           ├── session.py   # Conexão e sessão com banco
+│           └── repository.py# Operações de inserção e consulta
 ├── ml/
 │   ├── notebooks/           # Análise exploratória de dados (EDA) e prototipação
 │   ├── src/                 # Scripts modulares de ML (feature engineering, treino e teste)
 │   └── models/              # Modelos treinados salvos (.joblib, .pt)
-├── backend/
-│   └── app/                 # API REST em FastAPI para servir previsões e métricas
 ├── frontend/                # Aplicação web e dashboard em React / Vite / TailwindCSS
+├── tests/                   # Testes automatizados com pytest
 ├── docs/
 │   ├── monografia/          # Textos acadêmicos, capítulos e referências bibliográficas
-│   └── diagramas/           # Diagramas de arquitetura e fluxo de dados
+│   └── diagramas/           # Diagramas de arquitetura, fluxo de dados e DER
 ├── .gitignore               # Arquivos ignorados pelo Git
 ├── CONTRIBUTING.md          # Padrões de commits, branches e fluxo de trabalho
 └── README.md                # Apresentação do projeto
@@ -66,7 +75,43 @@ Este projeto adota:
 
 ---
 
+## 🤖 Machine Learning
+
+Esta seção descreve como treinar os modelos de previsão e classificação de risco.
+
+### Treinamento
+Execute o script de treinamento:
+```powershell
+python -m ml.src.train data/processed/pb_arboviroses_features.csv --output-dir ml/models --test-weeks 12
+```
+- **`--output-dir`**: diretório onde os arquivos `.joblib` e o relatório `metrics.json` serão salvos.
+- **`--test-weeks`**: número de semanas reservadas para o conjunto de teste (padrão: 12).
+
+### Estrutura dos artefatos
+- `ml/models/regression_<modelo>.joblib` – modelo de regressão (Ridge ou RandomForest) que prevê o número de casos na próxima semana (`alvo_casos_1sem`).
+- `ml/models/classification_<modelo>.joblib` – modelo de classificação que prevê o risco (`alvo_risco_1sem`).
+- `ml/models/metrics.json` – relatório com as métricas de desempenho (MAE, RMSE, R², acurácia e F1).
+
+### Testes
+Um teste automatizado foi adicionado em `tests/test_ml.py` que verifica:
+- Execução bem‑sucedida do script de treinamento em um subconjunto dos dados.
+- Criação dos arquivos de modelo e do relatório de métricas.
+
+> **Importante:** antes de rodar os testes certifique‑se de que as dependências estão instaladas:
+> ```powershell
+> pip install -r requirements.txt
+> ```
+
+---
+
 ## 👥 Autoria e Licença
 
 Desenvolvido como Trabalho de Conclusão de Curso (TCC).  
 Licença: MIT.
+
+
+## ⚙️ Inicialização automática
+
+Ao iniciar a API, o backend verifica os arquivos de catálogo em `data/raw/` (preferencialmente `pb_municipios_ibge_merged.json`) e popula ou sincroniza a tabela `municipios` automaticamente com nome, microrregião, mesorregião, população estimada e coordenadas geográficas (latitude e longitude). Isso garante que o endpoint `/api/municipios` sempre retorne dados completos sem a necessidade de intervenção manual.
+
+Caso deseje desativar esse comportamento, basta definir a variável de ambiente `POPULATE_MUNICIPIOS=false` antes de iniciar o contêiner.
