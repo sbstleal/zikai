@@ -96,3 +96,55 @@ def test_dashboard_resumo():
     assert "total_previsoes_ia" in resumo
     assert "alertas_por_gravidade" in resumo
 
+
+def test_criar_e_atualizar_alerta():
+    """Valida a criação via POST e atualização de status via PATCH de um alerta."""
+    novo_alerta = {
+        "municipio_geocode": 2507507,
+        "doenca": "chikungunya",
+        "titulo": "Alerta de teste automatizado",
+        "mensagem": "Detecção de elevação nos casos em João Pessoa.",
+        "nivel_gravidade": 3,
+    }
+    # 1. Criação com sucesso
+    res_post = client.post("/api/alertas", json=novo_alerta)
+    assert res_post.status_code == 201
+    alerta_criado = res_post.json()
+    assert alerta_criado["id"] is not None
+    assert alerta_criado["municipio_geocode"] == 2507507
+    assert alerta_criado["ativo"] == 1
+    alerta_id = alerta_criado["id"]
+
+    # 2. Atualização de status (resolver alerta)
+    res_patch = client.patch(f"/api/alertas/{alerta_id}/status", json={"ativo": 0})
+    assert res_patch.status_code == 200
+    assert res_patch.json()["ativo"] == 0
+
+    # 3. Falha ao criar para município inexistente
+    novo_alerta["municipio_geocode"] = 9999999
+    res_post_invalido = client.post("/api/alertas", json=novo_alerta)
+    assert res_post_invalido.status_code == 404
+
+
+def test_criar_previsao():
+    """Valida a criação via POST de uma previsão gerada por IA."""
+    nova_prev = {
+        "municipio_geocode": 2507507,
+        "doenca": "dengue",
+        "horizonte_semanas": 4,
+        "ano_alvo": 2026,
+        "semana_alvo": 45,
+        "casos_previstos": 120.5,
+        "intervalo_inferior": 90.0,
+        "intervalo_superior": 150.0,
+        "nivel_risco_previsto": 2,
+        "probabilidade_surto": 0.35,
+        "modelo_utilizado": "RandomForestRegressor_v1",
+    }
+    res = client.post("/api/previsoes", json=nova_prev)
+    assert res.status_code == 201
+    dados = res.json()
+    assert dados["municipio_geocode"] == 2507507
+    assert dados["casos_previstos"] == 120.5
+    assert dados["modelo_utilizado"] == "RandomForestRegressor_v1"
+

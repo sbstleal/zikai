@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from ..db.session import get_db
 from ..db import models
-from ..schemas import AlertaCreate, AlertaOut, AlertaVigilanciaOut
+from ..schemas import AlertaCreate, AlertaOut, AlertaUpdateStatus, AlertaVigilanciaOut
 
 router = APIRouter()
 
@@ -63,3 +63,27 @@ def criar_alerta(alerta: AlertaCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(novo)
     return novo
+
+
+@router.patch(
+    "/alertas/{alerta_id}/status",
+    response_model=AlertaOut,
+    summary="Atualiza o status de um alerta (resolver ou reativar)",
+)
+def atualizar_status_alerta(
+    alerta_id: int,
+    status_update: AlertaUpdateStatus,
+    db: Session = Depends(get_db),
+):
+    """Atualiza o campo `ativo` de um alerta (1 para ativo, 0 para resolvido)."""
+    alerta = db.query(models.AlertaVigilancia).filter(models.AlertaVigilancia.id == alerta_id).first()
+    if not alerta:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Alerta com id {alerta_id} não encontrado.",
+        )
+
+    alerta.ativo = status_update.ativo
+    db.commit()
+    db.refresh(alerta)
+    return alerta

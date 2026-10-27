@@ -48,6 +48,20 @@ class SerieEpidemiologicaOut(BaseModel):
         validate_by_name = True
 
 
+class PrevisaoIACreate(BaseModel):
+    municipio_geocode: int = Field(..., description="Código IBGE do município")
+    doenca: str = Field(..., description="Doença (dengue, chikungunya ou zika)")
+    horizonte_semanas: int = Field(..., ge=1, le=12, description="Horizonte de semanas à frente previsto")
+    ano_alvo: int = Field(..., description="Ano epidemiológico alvo")
+    semana_alvo: int = Field(..., ge=1, le=53, description="Semana epidemiológica alvo")
+    casos_previstos: float = Field(..., ge=0.0, description="Quantidade prevista de casos")
+    intervalo_inferior: Optional[float] = Field(None, description="Limite inferior do intervalo de confiança")
+    intervalo_superior: Optional[float] = Field(None, description="Limite superior do intervalo de confiança")
+    nivel_risco_previsto: int = Field(1, ge=1, le=4, description="Nível de risco previsto (1 a 4)")
+    probabilidade_surto: Optional[float] = Field(None, ge=0.0, le=1.0, description="Probabilidade estimada de surto")
+    modelo_utilizado: str = Field("RandomForestRegressor", description="Nome/versão do modelo utilizado")
+
+
 class PrevisaoIAOut(BaseModel):
     municipio_geocode: int = Field(..., description="Código IBGE do município")
     doenca: str
@@ -72,6 +86,10 @@ class AlertaCreate(BaseModel):
     titulo: str = Field(..., description="Título resumido do alerta")
     mensagem: str = Field(..., description="Mensagem descritiva do alerta")
     nivel_gravidade: int = Field(..., ge=1, le=4, description="Nível de gravidade (1=Verde a 4=Vermelho)")
+
+
+class AlertaUpdateStatus(BaseModel):
+    ativo: int = Field(..., ge=0, le=1, description="Status do alerta (1=Ativo, 0=Resolvido)")
 
 
 class AlertaVigilanciaOut(BaseModel):
