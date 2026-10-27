@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/alertsmanager.tsx","./src/components/epidemicchart.tsx","./src/components/metriccards.tsx","./src/components/paraibamap.tsx","./src/services/api.ts","./src/types/index.ts"],"version":"5.6.3"}

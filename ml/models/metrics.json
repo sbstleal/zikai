@@ -1,0 +1,93 @@
+{
+  "regression": {
+    "target": "alvo_casos_1sem",
+    "best_model": "rf",
+    "metrics": {
+      "ridge": {
+        "mae": 2.442998289206157,
+        "rmse": 3.9710911311208923,
+        "r2": 0.9814969542614722
+      },
+      "rf": {
+        "mae": 2.164958333333333,
+        "rmse": 5.14964525477241,
+        "r2": 0.9688844028226871
+      }
+    },
+    "test_samples": 240,
+    "train_samples": 3900
+  },
+  "classification": {
+    "target": "alvo_risco_1sem",
+    "best_model": "rf",
+    "metrics": {
+      "logreg": {
+        "accuracy": 0.9708333333333333,
+        "f1": 0.9710971163407358
+      },
+      "rf": {
+        "accuracy": 0.975,
+        "f1": 0.975
+      }
+    },
+    "test_samples": 240,
+    "train_samples": 3900
+  },
+  "features_used": [
+    "ano",
+    "semana_epidemiologica",
+    "casos_notificados",
+    "casos_estimados",
+    "taxa_reproducao_rt",
+    "probabilidade_rt_maior_1",
+    "nivel_alerta",
+    "temperatura_media",
+    "temperatura_minima",
+    "temperatura_maxima",
+    "umidade_media",
+    "umidade_minima",
+    "umidade_maxima",
+    "populacao",
+    "incidencia_100k",
+    "semana_sin",
+    "semana_cos",
+    "mes_sin",
+    "mes_cos",
+    "casos_notificados_lag_1",
+    "casos_notificados_lag_2",
+    "casos_notificados_lag_3",
+    "casos_notificados_lag_4",
+    "casos_estimados_lag_1",
+    "casos_estimados_lag_2",
+    "casos_estimados_lag_3",
+    "casos_estimados_lag_4",
+    "taxa_reproducao_rt_lag_1",
+    "taxa_reproducao_rt_lag_2",
+    "taxa_reproducao_rt_lag_3",
+    "taxa_reproducao_rt_lag_4",
+    "temperatura_media_lag_1",
+    "temperatura_media_lag_2",
+    "temperatura_media_lag_3",
+    "temperatura_maxima_lag_1",
+    "temperatura_maxima_lag_2",
+    "temperatura_maxima_lag_3",
+    "umidade_media_lag_1",
+    "umidade_media_lag_2",
+    "umidade_media_lag_3",
+    "casos_notificados_media_movel_4",
+    "casos_notificados_desvio_movel_4",
+    "casos_notificados_media_movel_8",
+    "casos_notificados_desvio_movel_8",
+    "temperatura_media_media_movel_4",
+    "temperatura_media_desvio_movel_4",
+    "temperatura_media_media_movel_8",
+    "temperatura_media_desvio_movel_8",
+    "umidade_media_media_movel_4",
+    "umidade_media_desvio_movel_4",
+    "umidade_media_media_movel_8",
+    "umidade_media_desvio_movel_8",
+    "doenca_chikungunya",
+    "doenca_dengue",
+    "doenca_zika"
+  ]
+}
