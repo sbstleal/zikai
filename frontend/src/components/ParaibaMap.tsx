@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Municipio } from '../types';
-import { MapPin, Navigation, Info } from 'lucide-react';
+import { MapPin, Navigation, Info, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface FeatureGeometry {
   type: string;
@@ -32,9 +32,13 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
   onSelectMunicipio,
 }) => {
   const [geoData, setGeoData] = useState<GeoJSONData | null>(null);
-  const [hoveredMun, setHoveredMun] = useState<Municipio | null>(null);
+  const [hoveredGeocode, setHoveredGeocode] = useState<number | null>(null);
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Carregar o GeoJSON real dos 223 municípios da Paraíba
+  // Carregar o GeoJSON oficial dos municípios da Paraíba
   useEffect(() => {
     fetch('/pb_malha_municipios.geojson')
       .then((res) => {
@@ -45,49 +49,113 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
       .catch((err) => console.error('Erro ao buscar GeoJSON:', err));
   }, []);
 
-  // Bounding box exato da Paraíba com margem de respiro
-  const bounds = useMemo(() => {
-    return {
-      minLon: -38.85,
-      maxLon: -34.70,
-      minLat: -8.38,
-      maxLat: -5.95,
-    };
-  }, []);
+  // Bounding box rigoroso da Paraíba (com margens de respiro)
+  // Oeste: -38.80, Leste: -34.75, Sul: -8.35, Norte: -6.00
+  const bounds = useMemo(() => ({
+    minLon: -38.82,
+    maxLon: -34.72,
+    minLat: -8.35,
+    maxLat: -5.98,
+  }), []);
 
-  const width = 800;
-  const height = 480;
+  // Proporções ideais preservando a física geográfica da Paraíba (lat ~ -7°)
+  const baseWidth = 820;
+  const baseHeight = 475;
 
-  // Projeção Mercator/Equirretangular adaptada para a Paraíba
-  const project = (lon: number, lat: number) => {
-    const x = ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * width;
-    const y = ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * height;
+  const project = (lon: number, lat: number): [number, number] => {
+    const x = ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * baseWidth;
+    const y = ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * baseHeight;
     return [x, y];
   };
 
-  // Converte anéis de coordenadas GeoJSON em caminho SVG "M x y L x y Z"
   const coordsToSvgPath = (coords: number[][]) => {
     if (!coords || coords.length === 0) return '';
     return coords
       .map((pt, idx) => {
         const [x, y] = project(pt[0], pt[1]);
-        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
       })
       .join(' ') + ' Z';
   };
 
-  // Mapeamento rápido de geocode para dados do município
+  // Mapeamento rápido geocode -> objeto Municipio
   const munMap = useMemo(() => {
     const map = new Map<number, Municipio>();
     municipios.forEach((m) => map.set(m.geocode, m));
     return map;
   }, [municipios]);
 
-  const selectedMun = munMap.get(selectedGeocode);
+  // Pré-computar os caminhos SVG de cada feature
+  const parsedFeatures = useMemo(() => {
+    if (!geoData) return [];
+    return geoData.features.map((feature) => {
+      const cod = parseInt(feature.properties.codarea, 10);
+      const geom = feature.geometry;
+      let pathData = '';
+
+      if (geom.type === 'Polygon') {
+        pathData = geom.coordinates.map((ring: number[][]) => coordsToSvgPath(ring)).join(' ');
+      } else if (geom.type === 'MultiPolygon') {
+        pathData = geom.coordinates
+          .map((poly: number[][][]) =>
+            poly.map((ring: number[][]) => coordsToSvgPath(ring)).join(' ')
+          )
+          .join(' ');
+      }
+
+      return {
+        cod,
+        pathData,
+        mun: munMap.get(cod),
+      };
+    });
+  }, [geoData, munMap]);
+
+  // Separação em camadas para DOM Order:
+  // 1. Polígonos neutros no fundo
+  // 2. Polígono Hovered em cima
+  // 3. Polígono Selecionado no topo absoluto
+  const regularFeatures = useMemo(() => {
+    return parsedFeatures.filter((f) => f.cod !== selectedGeocode && f.cod !== hoveredGeocode);
+  }, [parsedFeatures, selectedGeocode, hoveredGeocode]);
+
+  const hoveredFeature = useMemo(() => {
+    if (!hoveredGeocode || hoveredGeocode === selectedGeocode) return null;
+    return parsedFeatures.find((f) => f.cod === hoveredGeocode);
+  }, [parsedFeatures, hoveredGeocode, selectedGeocode]);
+
+  const selectedFeature = useMemo(() => {
+    return parsedFeatures.find((f) => f.cod === selectedGeocode);
+  }, [parsedFeatures, selectedGeocode]);
+
+  // Controles de Navegação (Zoom / Pan)
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.3, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.3, 0.8));
+  const handleResetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const activeMun = munMap.get(hoveredGeocode || selectedGeocode);
 
   return (
     <div className="bg-slate-800/70 border border-slate-700/60 rounded-xl p-6 shadow-xl backdrop-blur-sm space-y-4">
-      {/* Header do Mapa */}
+      {/* Header do Mapa com Ações e Informações */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -95,94 +163,137 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
             Malha Cartográfica da Paraíba (IBGE)
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Passe o mouse para inspecionar e clique sobre qualquer um dos 223 municípios
+            Passe o mouse com precisão sobre os limites exatos e clique para selecionar
           </p>
         </div>
 
-        {/* Badge do Município Ativo */}
-        {(hoveredMun || selectedMun) && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-emerald-500/40 rounded-lg text-xs shadow-md">
-            <MapPin className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
-            <span className="font-bold text-white">
-              {(hoveredMun || selectedMun)?.nome}
-            </span>
+        {/* Badge do Município Inspecionado */}
+        {activeMun && (
+          <div className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 border border-emerald-500/50 rounded-lg text-xs shadow-md animate-in fade-in">
+            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-bold text-white">{activeMun.nome}</span>
             <span className="text-slate-400">
-              • Pop:{' '}
+              • População:{' '}
               <strong className="text-emerald-400">
-                {(hoveredMun || selectedMun)?.populacao?.toLocaleString('pt-BR') || 'N/A'}
+                {activeMun.populacao ? activeMun.populacao.toLocaleString('pt-BR') : 'N/A'}
               </strong>
             </span>
           </div>
         )}
       </div>
 
-      {/* Área do SVG com contornos reais dos polígonos */}
-      <div className="relative w-full bg-slate-950/80 rounded-xl border border-slate-800/80 p-2 overflow-hidden flex items-center justify-center min-h-[360px]">
+      {/* Container SVG Interativo */}
+      <div
+        className="relative w-full bg-slate-950/90 rounded-xl border border-slate-800 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        style={{ height: '380px' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {/* Controles Flutuantes de Zoom / Reset */}
+        <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5 bg-slate-900/80 p-1 rounded-lg border border-slate-700/60 shadow-lg backdrop-blur-sm">
+          <button
+            onClick={handleZoomIn}
+            className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-all"
+            title="Aproximar (Zoom In)"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-all"
+            title="Afastar (Zoom Out)"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleResetView}
+            className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-all border-t border-slate-800"
+            title="Redefinir visualização"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {!geoData ? (
-          <div className="flex flex-col items-center justify-center text-slate-400 gap-2 py-16 animate-pulse">
+          <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs">Carregando contornos dos municípios da Paraíba...</span>
+            <span className="text-xs">Carregando polígonos dos municípios...</span>
           </div>
         ) : (
           <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-auto max-h-[420px] select-none filter drop-shadow-lg"
+            viewBox={`0 0 ${baseWidth} ${baseHeight}`}
+            className="w-full h-full pointer-events-auto"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: 'center center',
+              transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+            }}
           >
-            {/* Renderização de cada município como um polígono SVG real */}
-            {geoData.features.map((feature, i) => {
-              const cod = parseInt(feature.properties.codarea, 10);
-              const mun = munMap.get(cod);
-              const isSelected = cod === selectedGeocode;
-              const isHovered = hoveredMun?.geocode === cod;
-
-              const geom = feature.geometry;
-              let pathData = '';
-
-              if (geom.type === 'Polygon') {
-                pathData = geom.coordinates.map((ring: number[][]) => coordsToSvgPath(ring)).join(' ');
-              } else if (geom.type === 'MultiPolygon') {
-                pathData = geom.coordinates
-                  .map((poly: number[][][]) =>
-                    poly.map((ring: number[][]) => coordsToSvgPath(ring)).join(' ')
-                  )
-                  .join(' ');
-              }
-
-              return (
+            {/* 1ª Camada: Polígonos de Base dos Municípios */}
+            <g className="municipios-base" pointerEvents="visiblePainted">
+              {regularFeatures.map((f) => (
                 <path
-                  key={cod || i}
-                  d={pathData}
-                  onClick={() => onSelectMunicipio(cod)}
-                  onMouseEnter={() => mun && setHoveredMun(mun)}
-                  onMouseLeave={() => setHoveredMun(null)}
-                  fill={
-                    isSelected
-                      ? '#38bdf8' // Azul celeste vívido quando selecionado
-                      : isHovered
-                      ? '#10b981' // Verde esmeralda quando hovered
-                      : '#1e293b' // Slate-800 suave padrão
-                  }
-                  stroke={
-                    isSelected
-                      ? '#ffffff'
-                      : isHovered
-                      ? '#34d399'
-                      : '#334155'
-                  }
-                  strokeWidth={isSelected ? 2 : isHovered ? 1.5 : 0.6}
+                  key={f.cod}
+                  d={f.pathData}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectMunicipio(f.cod);
+                  }}
+                  onMouseEnter={() => setHoveredGeocode(f.cod)}
+                  onMouseLeave={() => setHoveredGeocode(null)}
+                  fill="#1e293b"
+                  stroke="#334155"
+                  strokeWidth="0.75"
                   strokeLinejoin="round"
-                  className="cursor-pointer transition-colors duration-150 hover:brightness-125"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  className="cursor-pointer transition-colors duration-100 hover:fill-emerald-600/70"
                 >
                   <title>
-                    {mun ? `${mun.nome} (IBGE: ${cod}) - População: ${mun.populacao?.toLocaleString('pt-BR') || 'N/A'}` : cod}
+                    {f.mun ? `${f.mun.nome} (Pop: ${f.mun.populacao?.toLocaleString('pt-BR') || 'N/A'})` : f.cod}
                   </title>
                 </path>
-              );
-            })}
+              ))}
+            </g>
 
-            {/* Marcador de destaque com pulso para o município selecionado */}
-            {selectedMun && selectedMun.latitude && selectedMun.longitude && (() => {
-              const [cx, cy] = project(selectedMun.longitude, selectedMun.latitude);
+            {/* 2ª Camada: Polígono Hovered (Renderizado no Topo para evitar sobreposição de borda) */}
+            {hoveredFeature && (
+              <path
+                d={hoveredFeature.pathData}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectMunicipio(hoveredFeature.cod);
+                }}
+                onMouseLeave={() => setHoveredGeocode(null)}
+                fill="#10b981"
+                stroke="#34d399"
+                strokeWidth="1.75"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                className="cursor-pointer drop-shadow-md"
+              />
+            )}
+
+            {/* 3ª Camada: Polígono Selecionado (Renderizado no Topo Absoluto) */}
+            {selectedFeature && (
+              <path
+                d={selectedFeature.pathData}
+                fill="#0284c7"
+                stroke="#38bdf8"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                className="drop-shadow-lg"
+              />
+            )}
+
+            {/* Marcador e Rótulo do Município Ativo */}
+            {selectedFeature?.mun && selectedFeature.mun.latitude && selectedFeature.mun.longitude && (() => {
+              const [cx, cy] = project(selectedFeature.mun.longitude, selectedFeature.mun.latitude);
               return (
                 <g className="pointer-events-none">
                   <circle
@@ -191,27 +302,30 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
                     r={5}
                     fill="#38bdf8"
                     stroke="#ffffff"
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                   />
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={14}
+                    r={13}
                     fill="none"
                     stroke="#38bdf8"
                     strokeWidth={2}
-                    className="animate-ping opacity-60"
+                    className="animate-ping opacity-75"
                   />
                   <text
                     x={cx}
                     y={cy - 10}
                     textAnchor="middle"
-                    fill="#38bdf8"
+                    fill="#ffffff"
                     fontSize={11}
-                    fontWeight="bold"
-                    className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
+                    fontWeight="800"
+                    stroke="#0f172a"
+                    strokeWidth="2.5"
+                    paintOrder="stroke fill"
+                    className="select-none"
                   >
-                    {selectedMun.nome}
+                    {selectedFeature.mun.nome}
                   </text>
                 </g>
               );
@@ -220,15 +334,16 @@ export const ParaibaMap: React.FC<ParaibaMapProps> = ({
         )}
       </div>
 
-      {/* Legenda e Referências Geográficas */}
+      {/* Rodapé com Instruções e Legenda */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400 pt-1 border-t border-slate-700/50">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#1e293b] border border-slate-600 inline-block" /> Município Regular
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#38bdf8] border border-white inline-block ml-2" /> Município Selecionado
+        <span className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#1e293b] border border-slate-600 inline-block" /> Regular
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#10b981] border border-[#34d399] inline-block ml-1" /> Em Foco
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#0284c7] border border-[#38bdf8] inline-block ml-1" /> Selecionado
         </span>
         <span className="text-[11px] text-slate-500 flex items-center gap-1">
           <Info className="w-3.5 h-3.5 text-slate-400" />
-          Malha Cartográfica Digital Oficial IBGE (223 Municípios)
+          Projeção Cartográfica Equirretangular calibrada • 223 Municípios IBGE
         </span>
       </div>
     </div>
